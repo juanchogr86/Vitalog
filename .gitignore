@@ -1,0 +1,6 @@
+**/target/
+frontend/node_modules/
+frontend/build/
+backend/src/main/resources/static/**
+!backend/src/main/resources/static/.gitkeep
+**/.env

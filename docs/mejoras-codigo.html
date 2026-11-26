@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Auditoría de seguridad y calidad — VitaLog (RU-02)</title>
+  <style>
+    :root { --bg:#f4f7fb; --card:#fff; --text:#172033; --muted:#5d6678; --line:#dfe5ef; --critical:#7f1d1d; --high:#c2410c; --medium:#a16207; --low:#2563eb; --op:#047857; }
+    * { box-sizing:border-box; }
+    body { margin:0; font-family:Segoe UI,Arial,sans-serif; color:var(--text); background:var(--bg); line-height:1.55; }
+    main { max-width:1120px; margin:auto; padding:28px 18px 48px; }
+    header, section { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:20px; margin-bottom:18px; }
+    h1 { margin:0 0 8px; font-size:1.75rem; } h2 { margin-top:0; } h3 { margin-bottom:6px; }
+    p { margin:.45rem 0; } .muted { color:var(--muted); }
+    table { width:100%; border-collapse:collapse; margin:12px 0; } th,td { text-align:left; border:1px solid var(--line); padding:9px; vertical-align:top; }
+    th { background:#eef3fa; } .badge { display:inline-block; border-radius:999px; color:#fff; padding:3px 9px; font-weight:700; font-size:.78rem; }
+    .critica { background:var(--critical); } .alta { background:var(--high); } .media { background:var(--medium); } .baja { background:var(--low); } .oportunidad { background:var(--op); }
+    .finding { border-left:5px solid var(--line); padding:14px 16px; margin:14px 0; background:#fbfcfe; }
+    .finding.media { border-left-color:var(--medium); } .finding.baja { border-left-color:var(--low); } .finding.oportunidad { border-left-color:var(--op); }
+    code, pre { font-family:Consolas,monospace; } pre { max-width:100%; overflow:auto; background:#111827; color:#e5e7eb; padding:12px; border-radius:8px; }
+    ul { margin:.35rem 0 .35rem 1.2rem; } .ok { color:#047857; font-weight:700; }
+    @media (max-width:680px) { main { padding:12px 10px 30px; } header,section { padding:14px; } table { font-size:.88rem; } th,td { padding:7px 5px; } }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Auditoría de seguridad y calidad — VitaLog</h1>
+    <p><strong>Alcance:</strong> implementación RU-02 (creación de hábitos), autenticación relacionada, configuración backend, repositorios MongoDB y cliente React. Fecha de análisis: 20 de noviembre de 2026.</p>
+    <p><strong>Resumen ejecutivo:</strong> la implementación actual mantiene correctamente la creación de hábitos asociada al usuario autenticado y valida frecuencia, duración y nombre. No se encontró una vulnerabilidad crítica ni alta confirmada dentro del alcance revisado. Sí se identificaron dos puntos medios: la cookie de sesión no configura <em>Secure</em> y no existe limitación de intentos de autenticación. También se observaron oportunidades concretas de paginación, índice MongoDB y endurecimiento operativo.</p>
+  </header>
+
+  <section>
+    <h2>Conteo por criticidad</h2>
+    <table>
+      <thead><tr><th>Criticidad</th><th>Cantidad</th><th>Significado</th></tr></thead>
+      <tbody>
+        <tr><td><span class="badge critica">CRÍTICA</span></td><td>0</td><td>Compromiso inmediato o masivo con evidencia directa.</td></tr>
+        <tr><td><span class="badge alta">ALTA</span></td><td>0</td><td>Explotación probable con impacto relevante.</td></tr>
+        <tr><td><span class="badge media">MEDIA</span></td><td>2</td><td>Riesgo relevante que depende de configuración o carga de uso.</td></tr>
+        <tr><td><span class="badge baja">BAJA</span></td><td>1</td><td>Endurecimiento útil o impacto limitado en el escenario actual.</td></tr>
+        <tr><td><span class="badge oportunidad">OPORTUNIDAD</span></td><td>3</td><td>Mejora de rendimiento, mantenibilidad o prevención preventiva.</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>1. Vulnerabilidades y riesgos de seguridad</h2>
+
+    <article class="finding media">
+      <h3><span class="badge media">MEDIA</span> Sesión sin atributo de cookie Secure</h3>
+      <p><strong>Confianza:</strong> Alta.</p>
+      <p><strong>Ubicación:</strong> <code>backend/src/main/resources/application.properties</code>.</p>
+      <p><strong>Evidencia:</strong> se configura <code>HttpOnly=true</code> y <code>SameSite=lax</code>, pero no <code>server.servlet.session.cookie.secure=true</code>. Las demás configuraciones no establecen TLS ni proxy HTTPS.</p>
+      <p><strong>Impacto:</strong> si la aplicación se publica por HTTP o un proxy permite conexión insegura, la cookie de sesión puede viajar sin cifrado y ser visible por terceros en la red. Esto podría permitir secuestro de sesión.</p>
+      <p><strong>Recomendación:</strong> habilitar Secure en despliegues HTTPS y validar que el proxy configure correctamente el esquema de origen. Mantener el atributo HttpOnly y SameSite.</p>
+    </article>
+
+    <article class="finding media">
+      <h3><span class="badge media">MEDIA</span> No hay limitación de intentos de registro o inicio de sesión</h3>
+      <p><strong>Confianza:</strong> Alta sobre la ausencia observada; impacto operativo probable, no explotado.</p>
+      <p><strong>Ubicación:</strong> <code>SecurityConfig.java</code>, <code>AuthController.java</code> y <code>AuthService.java</code>.</p>
+      <p><strong>Evidencia:</strong> los endpoints públicos de login y registro no presentan filtros de velocidad, bloqueo temporal, reintentos ni mecanismos de protección conocidos en el código. El login usa BCrypt, que eleva el costo por intento.</p>
+      <p><strong>Impacto:</strong> un atacante puede automatizar contraseñas o crear cuentas masivas, aumentando el consumo de CPU y la posibilidad de acceso no autorizado.</p>
+      <p><strong>Recomendación:</strong> incorporar limitación por dirección/IP y por cuenta, con una ventana y bloqueo temporales. Aplicar además monitoreo de intentos fallidos y proteger explícitamente registro y recuperación futura.</p>
+    </article>
+
+    <article class="finding baja">
+      <h3><span class="badge baja">BAJA</span> MongoDB sin autenticación explícita en el contenedor local</h3>
+      <p><strong>Confianza:</strong> Alta en la configuración; riesgo condicionado al despliegue.</p>
+      <p><strong>Ubicación:</strong> <code>compose.yaml</code> y <code>application.properties</code>.</p>
+      <p><strong>Evidencia:</strong> el contenedor enlaza MongoDB únicamente a 127.0.0.1 y no define usuarios de MongoDB. La URI predeterminada usa <code>mongodb://localhost:27017/vitalog</code>.</p>
+      <p><strong>Impacto:</strong> en el entorno actual el puerto no queda expuesto fuera del equipo. En otro entorno o si se modifica el compose, una instancia sin autenticación permitiría acceso directo a datos y cuentas.</p>
+      <p><strong>Recomendación:</strong> conservar el enlace a loopback en desarrollo y configurar autenticación, secretos administrados y cifrado cuando exista una instancia compartida o productiva.</p>
+    </article>
+
+    <h3>Controles positivos confirmados en RU-02</h3>
+    <ul>
+      <li><span class="ok">Autorización:</span> <code>POST /api/habits</code> exige sesión autenticada y el servicio crea el hábito con el ID asociado al correo autenticado.</li>
+      <li><span class="ok">Validación:</span> nombre obligatorio y máximo 100 caracteres, duración entre 1 y 3650 días, frecuencia requerida y días semanales limitados a valores válidos.</li>
+      <li><span class="ok">Protección CSRF:</span> las operaciones POST usan token CSRF y la sesión cambia su ID al autenticarse.</li>
+      <li><span class="ok">Contraseñas:</span> registro usa BCrypt y no se devuelve el hash en las respuestas.</li>
+      <li><span class="ok">XSS:</span> React renderiza el nombre del hábito como texto mediante el DOM de React; no se encontró <code>dangerouslySetInnerHTML</code> ni manipulación directa de HTML.</li>
+      <li><span class="ok">Inyección NoSQL:</span> no se encontraron filtros construidos con entrada de usuario ni consultas <code>$where</code>. Las consultas derivadas son tipadas por nombre de propiedad.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>2. Malas prácticas y deuda técnica</h2>
+
+    <article class="finding oportunidad">
+      <h3><span class="badge oportunidad">OPORTUNIDAD</span> CO-01 — Inconsistencia entre límite de caracteres y límite de bytes de contraseña</h3>
+      <p><strong>Confianza:</strong> Alta.</p>
+      <p><strong>Ubicación:</strong> <code>RegisterRequest.java</code>, <code>AuthService.java</code> y <code>AuthPage.js</code>.</p>
+      <p><strong>Evidencia:</strong> el DTO permite hasta 72 caracteres y el frontend define <code>maxLength=72</code>, mientras <code>AuthService</code> rechaza contraseñas que excedan 72 bytes UTF-8.</p>
+      <p><strong>Impacto:</strong> una contraseña compuesta principalmente por caracteres multibyte puede ser aceptada por validación HTML/DTO y luego rechazada con un error posterior. Es una inconsistencia de experiencia de usuario y de validación.</p>
+      <p><strong>Recomendación:</strong> definir una política única basada en bytes o, preferiblemente, limitar el resultado que el backend acepta y comunicar el mismo límite en texto y atributos del formulario. Evitar dos reglas similares que puedan divergir.</p>
+    </article>
+
+    <article class="finding oportunidad">
+      <h3><span class="badge oportunidad">OPORTUNIDAD</span> CO-02 — Dependencia obsoleta del frontend</h3>
+      <p><strong>Confianza:</strong> Alta.</p>
+      <p><strong>Ubicación:</strong> <code>frontend/package.json</code> y README.</p>
+      <p><strong>Evidencia:</strong> el proyecto usa Create React App/react-scripts 5.0.1 y React 18.3.1. El propio README reconoce que CRA está obsoleto.</p>
+      <p><strong>Impacto:</strong> menor soporte para nuevas herramientas y posibles dificultades al incorporar parches o mejoras de seguridad de la cadena de construcción.</p>
+      <p><strong>Recomendación:</strong> planificar una migración por etapas a una herramienta mantenida, ejecutando primero las pruebas y verificando el empaquetado estático.</p>
+    </article>
+
+    <article class="finding oportunidad">
+      <h3><span class="badge oportunidad">OPORTUNIDAD</span> CO-03 — Estado de carga puede quedar desalineado tras un error de creación</h3>
+      <p><strong>Confianza:</strong> Media.</p>
+      <p><strong>Ubicación:</strong> <code>frontend/src/pages/WelcomePage.js</code>, variable <code>createdDuringLoad</code>.</p>
+      <p><strong>Evidencia:</strong> se marca <code>createdDuringLoad.current = true</code> antes de enviar la creación y nunca se restablece en el bloque de error o éxito. Esta bandera evita que una respuesta de carga inicial sobrescriba el hábito recién creado.</p>
+      <p><strong>Impacto:</strong> si la creación falla mientras una carga inicial sigue en curso, la carga posterior puede quedar descartada y la lista no actualizarse durante la vida del componente.</p>
+      <p><strong>Recomendación:</strong> reemplazar la bandera por una cancelación de carga o por una sincronización basada en identificadores de solicitud y estado de montaje. Gestionar por separado éxito, error y carga de la lista.</p>
+    </article>
+  </section>
+
+  <section>
+    <h2>3. Rendimiento y arquitectura</h2>
+
+    <article class="finding oportunidad">
+      <h3><span class="badge oportunidad">OPORTUNIDAD</span> RE-01 — Consulta de hábitos sin índice específico ni paginación</h3>
+      <p><strong>Confianza:</strong> Alta sobre la implementación actual; impacto depende del volumen.</p>
+      <p><strong>Ubicación:</strong> <code>HabitController.java</code>, <code>HabitRepository.java</code> y <code>Habit.java</code>.</p>
+      <p><strong>Evidencia:</strong> <code>findByUserIdOrderByStartDateDesc</code> devuelve toda la colección filtrada por usuario sin <code>Pageable</code>. El campo <code>userId</code> no tiene índice y el campo <code>startDate</code> no forma parte de un índice compuesto.</p>
+      <p><strong>Impacto:</strong> al crecer el número de hábitos o usuarios, MongoDB puede recorrer más documentos y ordenar resultados en memoria. La interfaz recibirá una lista completa aunque solo muestre una cantidad limitada.</p>
+      <p><strong>Recomendación:</strong> crear un índice compuesto en <code>{ userId: 1, startDate: -1 }</code> y aceptar <code>Pageable</code> o cursores con límite en la consulta y el API. Mantener el orden descendente previsto por RU-02 y evolucionar la interfaz hacia carga paginada.</p>
+    </article>
+
+    <article class="finding oportunidad">
+      <h3><span class="badge oportunidad">OPORTUNIDAD</span> RE-02 — Mejorar aislamiento de lógica y reutilización de carga</h3>
+      <p><strong>Confianza:</strong> Media.</p>
+      <p><strong>Ubicación:</strong> <code>HabitController.java</code>, <code>HabitService.java</code> y <code>WelcomePage.js</code>.</p>
+      <p><strong>Evidencia:</strong> el listado resuelve la cuenta y consulta el repositorio directamente desde el controlador, mientras la creación delega en el servicio. El frontend combina estado de formulario y estado de hábitos en un único componente grande.</p>
+      <p><strong>Impacto:</strong> aumenta el costo de pruebas y hace más probable duplicar lógica de usuario o mantener estados concurrentes. No representa una vulnerabilidad confirmada.</p>
+      <p><strong>Recomendación:</strong> trasladar el listado completo al servicio y separar componentes de formulario y listado. Mantener inyección por constructor, que ya facilita las pruebas unitarias.</p>
+    </article>
+  </section>
+
+  <section>
+    <h2>4. Alcance del código revisado</h2>
+    <p>Se revisaron requisitos RU-02, configuración de seguridad, controladores y servicios de autenticación/hábitos, DTO, modelo y repositorios MongoDB, cliente React y pruebas de integración disponibles. También se revisó el archivo Compose y la documentación técnica inicial.</p>
+  </section>
+
+  <section>
+    <h2>Limitaciones y verificaciones adicionales</h2>
+    <ul>
+      <li>No se realizaron ataques ni pruebas contra sistemas externos.</li>
+      <li>No se verificó un despliegue HTTPS real, encabezados de infraestructura, configuración de reverse proxy ni protección distribuida frente a fuerza bruta.</li>
+      <li>No se analizaron dependencias binarias más allá del manifiesto Maven/package-lock disponible.</li>
+      <li>No se encontró evidencia suficiente para afirmar vulnerabilidades de CORS, JWT, XSS o inyección NoSQL; no existen JWT en el flujo revisado y se usa sesión/cookie CSRF.</li>
+      <li>Verificar con un escaneo de dependencias actualizado y pruebas de carga antes de producción.</li>
+      <li>La funcionalidad del resto de RU-03 a RU-11 no está implementada en el código revisado y queda fuera de una conclusión sobre esas prestaciones.</li>
+    </ul>
+  </section>
+</main>
+</body>
+</html>
