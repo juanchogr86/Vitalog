@@ -1,5 +1,5 @@
 # Vitalog
-
+Proyecto del curso asistido con IA.
 Monorepositorio con backend Spring Boot, frontend React y la documentación proporcionada. Incluye la estructura inicial y el flujo de registro e inicio de sesión con correo y contraseña de RU-01.
 
 ## Decisiones iniciales
