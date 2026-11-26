@@ -1,6 +1,17 @@
 # Vitalog
 Proyecto del curso asistido con IA.
-Monorepositorio con backend Spring Boot, frontend React y la documentación proporcionada. Incluye la estructura inicial y el flujo de registro e inicio de sesión con correo y contraseña de RU-01.
+Monorepositorio con backend Spring Boot, frontend React y documentación funcional. Actualmente implementa el registro e inicio de sesión con correo y contraseña, además de las funciones iniciales para crear y consultar hábitos.
+
+## Estado actual
+
+| Requisito | Estado | Implementación actual |
+|---|---|---|
+| RU-01 — Crear cuenta e iniciar sesión | Parcial | Registro e inicio de sesión con correo y contraseña, sesión y cierre de sesión. El acceso con Google está pendiente. |
+| RU-02 — Crear un hábito | Implementado con una discrepancia | Creación de hábitos diarios y semanales, validación de días, duración y persistencia por usuario. La categoría «en construcción» aún no se muestra. |
+| RU-03 — Consultar hábitos | Parcial | Se muestra la lista de hábitos del usuario; faltan las categorías y la identificación de los hábitos programados para el día actual. |
+| RU-04 a RU-11 | Pendientes | El registro de cumplimiento, consolidación, calendario de progreso, recordatorios, sugerencias, archivo, eliminación y acciones desde recordatorios no están implementados. |
+
+El detalle y las discrepancias conocidas de RU-02 están documentados en [docs/requerimientos_usuario_vitalog.md](docs/requerimientos_usuario_vitalog.md). La lista de requisitos funcionales completa está en ese documento; las historias de usuario y el contexto ágil están en [docs/actividad_agil.md](docs/actividad_agil.md).
 
 ## Decisiones iniciales
 
@@ -92,4 +103,4 @@ Pruebas y compilación del backend:
 docker run --rm -v "%CD%\backend:/workspace" -v vitalog-maven-cache:/root/.m2 -w /workspace -e MONGODB_URI=mongodb://host.docker.internal:27017/vitalog_test maven:3.9.16-eclipse-temurin-21 mvn -B clean verify
 ```
 
-No se han creado requisitos de usuario ni historias de usuario.
+Las pruebas automatizadas del frontend están en `frontend/src/App.test.js`; las pruebas del backend están en `backend/src/test/java/com/vitalog/`.
